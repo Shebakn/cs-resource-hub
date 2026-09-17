@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ResourceType {
+  THEORY
+  PRACTICAL
+}
+
+enum BotEventType {
+  WAITING_DOCUMENT
+  WAITING_TITLE
+  WAITING_ADMIN_PROMOTION
+  PROCESSING
+}
+
+model BotEvent {
+  id Int @id @default(autoincrement())
+
+  userId    Int
+  chatId    String
+  messageId Int
+
+  event BotEventType
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId])
+  @@index([createdAt])
+  @@index([event])
+}
+
+model User {
+  id         Int     @id @default(autoincrement())
+  telegramId String  @unique
+  firstName  String?
+  lastName   String?
+  username   String?
+  isAdmin    Boolean @default(false)
+
+  // Soft Delete
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  botEvent BotEvent?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Department {
+  id        Int              @id @default(autoincrement())
+  name      String           @unique
+  tracks    Track[]
+  offerings CourseOffering[]
+}
+
+model Track {
+  id           Int              @id @default(autoincrement())
+  name         String
+  departmentId Int
+  department   Department       @relation(fields: [departmentId], references: [id])
+  offerings    CourseOffering[]
+
+  @@unique([departmentId, name])
+}
+
+model Level {
+  id        Int              @id @default(autoincrement())
+  number    Int              @unique
+  name      String
+  offerings CourseOffering[]
+}
+
+model Term {
+  id        Int              @id @default(autoincrement())
+  number    Int              @unique
+  name      String
+  offerings CourseOffering[]
+}
+
+model AcademicYear {
+  id        Int              @id @default(autoincrement())
+  startYear Int
+  endYear   Int
+  offerings CourseOffering[]
+
+  @@unique([startYear, endYear])
+}
+
+model Course {
+  id        Int              @id @default(autoincrement())
+  name      String
+  code      String?
+  offerings CourseOffering[]
+}
+
+model CourseOffering {
+  id             Int  @id @default(autoincrement())
+  courseId       Int
+  departmentId   Int
+  trackId        Int?
+  levelId        Int
+  termId         Int
+  academicYearId Int
+
+  course       Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  department   Department   @relation(fields: [departmentId], references: [id])
+  track        Track?       @relation(fields: [trackId], references: [id])
+  level        Level        @relation(fields: [levelId], references: [id])
+  term         Term         @relation(fields: [termId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  materials Material[]
+  exams     Exam[]
+  sources   Source[]
+
+  @@index([departmentId, trackId, levelId, termId, academicYearId])
+}
+
+model Material {
+  id               Int          @id @default(autoincrement())
+  courseOfferingId Int
+  title            String
+  type             ResourceType
+  sortOrder        Int          @default(0)
+
+  telegramChatId    String
+  telegramMessageId Int
+  telegramFileId    String?
+  caption           String?
+
+  courseOffering CourseOffering @relation(fields: [courseOfferingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([courseOfferingId])
+  @@index([courseOfferingId, type])
+  @@index([telegramChatId, telegramMessageId])
+}
+
+model Exam {
+  id               Int          @id @default(autoincrement())
+  courseOfferingId Int
+  title            String
+  type             ResourceType
+
+  telegramChatId    String
+  telegramMessageId Int
+  telegramFileId    String?
+  caption           String?
+
+  courseOffering CourseOffering @relation(fields: [courseOfferingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([courseOfferingId])
+  @@index([courseOfferingId, type])
+  @@index([telegramChatId, telegramMessageId])
+}
+
+model Source {
+  id               Int     @id @default(autoincrement())
+  courseOfferingId Int
+  title            String
+  url              String
+  caption          String?
+
+  courseOffering CourseOffering @relation(fields: [courseOfferingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([courseOfferingId])
+}
