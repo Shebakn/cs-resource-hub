@@ -130,7 +130,7 @@ export class MaterialsHandler {
 ❌ <b>لا توجد تخصصات متاحة حاليًا</b>
 
 لم يتم العثور على أي تخصص يحتوي على مقررات أو مواد تعليمية.
-        `.trim(),
+      `.trim(),
         {
           parse_mode: 'HTML',
         },
@@ -148,21 +148,28 @@ export class MaterialsHandler {
 🎓 <b>اختر التخصص</b>
 
 اختر تخصصك للانتقال إلى المستويات الدراسية والمقررات المتاحة.
-      `.trim(),
+    `.trim(),
       {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: departments.map((department) => [
-            {
-              text: `🎓 ${department.name}`,
-              callback_data: `sm/${department.id}`,
-            },
-          ]),
+          inline_keyboard: [
+            ...departments.map((department) => [
+              {
+                text: `🎓 ${department.name}`,
+                callback_data: `sm/${department.id}`,
+              },
+            ]),
+            [
+              {
+                text: '⬅️ السابق',
+                callback_data: 'main_menu',
+              },
+            ],
+          ],
         },
       },
     );
   }
-
   // ============================================================
   // 2. Levels
   // ============================================================
@@ -186,7 +193,7 @@ export class MaterialsHandler {
 ❌ <b>لا توجد مستويات دراسية متاحة</b>
 
 لم يتم إعداد المستويات الدراسية لهذا النظام حتى الآن.
-        `.trim(),
+      `.trim(),
         {
           parse_mode: 'HTML',
         },
@@ -207,21 +214,28 @@ ${this.escapeHtml(department.name)}
 📖 <b>اختر المستوى الدراسي</b>
 
 اختر المستوى للوصول إلى المقررات والمواد التعليمية الخاصة به.
-      `.trim(),
+    `.trim(),
       {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: levels.map((level) => [
-            {
-              text: `📖 ${level.name}`,
-              callback_data: `sm/${departmentId}/${level.id}`,
-            },
-          ]),
+          inline_keyboard: [
+            ...levels.map((level) => [
+              {
+                text: `📖 ${level.name}`,
+                callback_data: `sm/${departmentId}/${level.id}`,
+              },
+            ]),
+            [
+              {
+                text: '⬅️ السابق',
+                callback_data: 'sm',
+              },
+            ],
+          ],
         },
       },
     );
   }
-
   // ============================================================
   // 3. Terms
   // ============================================================
@@ -339,8 +353,8 @@ ${this.escapeHtml(level.name)}
 
     buttons.push([
       {
-        text: '📚 بدون تراك',
-        callback_data: `sm/${departmentId}/${levelId}/${termId}/none`,
+        text: '⬅️ السابق',
+        callback_data: `sm/${departmentId}/${levelId}`,
       },
     ]);
 
@@ -355,7 +369,7 @@ ${this.escapeHtml(level.name)}
 حدد المسار الأكاديمي الذي تريد عرض مقرراته ومواده التعليمية.
 
 💡 <i>إذا لم يكن المقرر مرتبطًا بتراك، اختر «بدون تراك».</i>
-      `.trim(),
+    `.trim(),
       {
         parse_mode: 'HTML',
         reply_markup: {
@@ -395,9 +409,19 @@ ${this.escapeHtml(level.name)}
 لم يتم العثور على مقررات تحتوي على مواد تعليمية لهذا الاختيار.
 
 💡 <i>يمكنك الرجوع واختيار تخصص أو مستوى أو ترم آخر.</i>
-        `.trim(),
+  `.trim(),
         {
           parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '⬅️ السابق',
+                  callback_data: `sm/${departmentId}/${levelId}`,
+                },
+              ],
+            ],
+          },
         },
       );
 
@@ -413,16 +437,24 @@ ${this.escapeHtml(level.name)}
 📖 <b>اختر المقرر</b>
 
 اختر المقرر الذي تريد الاطلاع على ملازمه ومواده التعليمية.
-      `.trim(),
+  `.trim(),
       {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: courses.map((course) => [
-            {
-              text: `📘 ${course.name}`,
-              callback_data: `sm/${departmentId}/${levelId}/${termId}/${trackValue}/${course.id}`,
-            },
-          ]),
+          inline_keyboard: [
+            ...courses.map((course) => [
+              {
+                text: `📘 ${course.name}`,
+                callback_data: `sm/${departmentId}/${levelId}/${termId}/${trackValue}/${course.id}`,
+              },
+            ]),
+            [
+              {
+                text: '⬅️ السابق',
+                callback_data: `sm/${departmentId}/${levelId}/${termId}`,
+              },
+            ],
+          ],
         },
       },
     );
@@ -459,9 +491,19 @@ ${this.escapeHtml(level.name)}
 ❌ <b>لا توجد مواد لهذا المقرر</b>
 
 لم يتم العثور على سنة دراسية تحتوي على مواد تعليمية متاحة لهذا المقرر.
-        `.trim(),
+  `.trim(),
         {
           parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '⬅️ السابق',
+                  callback_data: `sm/${departmentId}/${levelId}/${termId}/${trackValue}`,
+                },
+              ],
+            ],
+          },
         },
       );
 
@@ -477,19 +519,27 @@ ${this.escapeHtml(level.name)}
 📅 <b>اختر السنة الدراسية</b>
 
 حدد السنة الدراسية التي تريد عرض المواد المتوفرة فيها.
-      `.trim(),
+  `.trim(),
       {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: offerings.map((offering) => [
-            {
-              text: `📅 ${this.formatAcademicYear(
-                offering.academicYear.startYear,
-                offering.academicYear.endYear,
-              )}`,
-              callback_data: `sm/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}/${offering.academicYearId}`,
-            },
-          ]),
+          inline_keyboard: [
+            ...offerings.map((offering) => [
+              {
+                text: `📅 ${this.formatAcademicYear(
+                  offering.academicYear.startYear,
+                  offering.academicYear.endYear,
+                )}`,
+                callback_data: `sm/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}/${offering.academicYearId}`,
+              },
+            ]),
+            [
+              {
+                text: '⬅️ السابق',
+                callback_data: `sm/${departmentId}/${levelId}/${termId}/${trackValue}`,
+              },
+            ],
+          ],
         },
       },
     );
@@ -540,9 +590,19 @@ ${this.escapeHtml(level.name)}
 ❌ <b>لا توجد مواد متاحة</b>
 
 لا توجد ملفات تعليمية متاحة لهذا المقرر في السنة الدراسية المحددة.
-        `.trim(),
+  `.trim(),
         {
           parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '⬅️ السابق',
+                  callback_data: `sm/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}`,
+                },
+              ],
+            ],
+          },
         },
       );
 
@@ -561,16 +621,24 @@ ${this.escapeHtml(level.name)}
 
 📘 <b>نظري</b> — المحاضرات والملازم النظرية
 🧪 <b>عملي</b> — المعامل والتطبيقات العملية
-      `.trim(),
+  `.trim(),
       {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: types.map((type) => [
-            {
-              text: this.getTypeLabel(type),
-              callback_data: `sm/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}/${academicYearId}/${type}`,
-            },
-          ]),
+          inline_keyboard: [
+            ...types.map((type) => [
+              {
+                text: this.getTypeLabel(type),
+                callback_data: `sm/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}/${academicYearId}/${type}`,
+              },
+            ]),
+            [
+              {
+                text: '⬅️ السابق',
+                callback_data: `sm/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}/${academicYearId}`,
+              },
+            ],
+          ],
         },
       },
     );

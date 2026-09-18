@@ -42,7 +42,7 @@ export class StartHandler {
 
     await ctx.reply(welcomeMessage, {
       parse_mode: 'HTML',
-      ...mainMenuKeyboard(isAdmin),
+      ...mainMenuKeyboard(isAdmin, Number(telegramId)),
     });
   }
 
@@ -67,7 +67,7 @@ export class StartHandler {
 
     await ctx.editMessageText(messageText, {
       parse_mode: 'HTML',
-      ...mainMenuKeyboard(isAdmin),
+      ...mainMenuKeyboard(isAdmin, Number(telegramId)),
     });
   }
 }

@@ -39,4 +39,8 @@ export class CourseService {
   async deleteCourse(id: number) {
     return this.courseRepository.delete(id);
   }
+
+  async getCoursesPaginated(page: number, limit: number) {
+    return this.courseRepository.getCoursesPaginated(page, limit);
+  }
 }

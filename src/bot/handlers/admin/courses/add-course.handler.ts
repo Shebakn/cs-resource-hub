@@ -23,7 +23,7 @@ export class AddCourseHandler {
   // بدء إضافة كورس
   // ============================================================
 
-  @Action('ac')
+  @Action('ach')
   async start(@Ctx() ctx: Context): Promise<void> {
     await ctx.answerCbQuery();
 

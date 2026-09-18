@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/restrict-plus-operands */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -61,9 +62,12 @@ export class AssignCourseHandler {
     // جلب الكورسات
     // ============================================================
 
-    const courses = await this.courseService.getCourses();
+    const page = 1;
+    const limit = 8;
 
-    if (!courses.length) {
+    const result = await this.courseService.getCoursesPaginated(page, limit);
+
+    if (!result.courses.length) {
       await ctx.reply(
         '❌ لا توجد كورسات حاليًا.\n\n' + 'قم بإضافة كورس أولًا.',
       );
@@ -79,7 +83,7 @@ export class AssignCourseHandler {
       '📚 <b>إسناد كورس إلى فصل</b>\n\n' + 'اختر الكورس الذي تريد إسناده:',
       {
         parse_mode: 'HTML',
-        ...courseKeyboard(courses, 'ac'),
+        ...courseKeyboard(result.courses, 'ac', result.page, result.totalPages),
       },
     );
 
@@ -92,6 +96,9 @@ export class AssignCourseHandler {
       event: BotEventType.WAITING_COURSE_OFFERING_COURSE,
       messageId: message.message_id,
       chatId: String(ctx.chat?.id ?? ''),
+      data: {
+        page,
+      },
     });
   }
 
@@ -981,6 +988,111 @@ export class AssignCourseHandler {
       termId,
       academicYearId,
     });
+  }
+
+  @Action('ac/next')
+  async nextCourses(@Ctx() ctx: Context): Promise<void> {
+    await ctx.answerCbQuery();
+
+    const userId = ctx.from?.id;
+
+    if (!userId) {
+      return;
+    }
+
+    const event = this.botEventService.get(userId);
+
+    if (!event) {
+      await ctx.reply(
+        'ℹ️ انتهت عملية الإسناد.\n\n' + 'يرجى بدء العملية من جديد.',
+      );
+
+      return;
+    }
+
+    if (event.event !== BotEventType.WAITING_COURSE_OFFERING_COURSE) {
+      return;
+    }
+
+    const currentPage = Number(event.data?.page ?? 1);
+    const nextPage = currentPage + 1;
+
+    const limit = 8;
+
+    const result = await this.courseService.getCoursesPaginated(
+      nextPage,
+      limit,
+    );
+
+    if (!result.courses.length) {
+      return;
+    }
+
+    this.botEventService.update(userId, {
+      data: {
+        page: result.page,
+      },
+    });
+
+    await ctx.editMessageReplyMarkup(
+      courseKeyboard(result.courses, 'ac', result.page, result.totalPages)
+        .reply_markup,
+    );
+  }
+
+  @Action('ac/prev')
+  async previousCourses(@Ctx() ctx: Context): Promise<void> {
+    await ctx.answerCbQuery();
+
+    const userId = ctx.from?.id;
+
+    if (!userId) {
+      return;
+    }
+
+    const event = this.botEventService.get(userId);
+
+    if (!event) {
+      await ctx.reply(
+        'ℹ️ انتهت عملية الإسناد.\n\n' + 'يرجى بدء العملية من جديد.',
+      );
+
+      return;
+    }
+
+    if (event.event !== BotEventType.WAITING_COURSE_OFFERING_COURSE) {
+      return;
+    }
+
+    const currentPage = Number(event.data?.page ?? 1);
+
+    if (currentPage <= 1) {
+      return;
+    }
+
+    const previousPage = currentPage - 1;
+
+    const limit = 8;
+
+    const result = await this.courseService.getCoursesPaginated(
+      previousPage,
+      limit,
+    );
+
+    if (!result.courses.length) {
+      return;
+    }
+
+    this.botEventService.update(userId, {
+      data: {
+        page: result.page,
+      },
+    });
+
+    await ctx.editMessageReplyMarkup(
+      courseKeyboard(result.courses, 'ac', result.page, result.totalPages)
+        .reply_markup,
+    );
   }
 
   // ============================================================

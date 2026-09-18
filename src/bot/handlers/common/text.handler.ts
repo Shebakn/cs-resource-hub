@@ -6,7 +6,7 @@ import {
   BotEventType,
 } from 'src/bot/services/bot-event.service';
 import { AddMaterialHandler } from '../admin/materials/add-material.handler';
-//import { AddCourseHandler } from '../admin/courses/add-course.handler';
+import { AddCourseHandler } from '../admin/courses/add-course.handler';
 import { EditCourseHandler } from '../admin/courses/edit-course.handler';
 import { AddExamHandler } from '../admin/exams/add-exam.handler';
 import { PromoteUserHandler } from '../admin/users/promote-user.handler';
@@ -15,7 +15,7 @@ import { DemoteAdminHandler } from '../admin/users/demote-user.handler';
 export class CentralTextHandler {
   constructor(
     private readonly botEventService: BotEventService,
-    //  private readonly addCourseHandler: AddCourseHandler,
+    private readonly addCourseHandler: AddCourseHandler,
     private readonly editCourseHandler: EditCourseHandler,
     private readonly addMaterialHandler: AddMaterialHandler,
     private readonly addExamHandler: AddExamHandler,
@@ -67,7 +67,7 @@ export class CentralTextHandler {
       // ==========================================================
 
       case BotEventType.WAITING_COURSE_NAME:
-        //await this.addCourseHandler.handleCourseName(ctx);
+        await this.addCourseHandler.handleCourseName(ctx);
         return;
 
       // ==========================================================

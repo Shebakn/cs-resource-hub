@@ -337,6 +337,177 @@ async function main() {
     }
   }
 
+  // ============================================================
+  // Level 1 / Term 2 Courses
+  // ============================================================
+
+  const secondTerm = await prisma.term.findUnique({
+    where: {
+      number: 2,
+    },
+  });
+
+  if (!secondTerm) {
+    throw new Error('❌ الترم الثاني غير موجود');
+  }
+
+  const levelOneTermTwoCourseNames = [
+    'الفيزياء العامة',
+    'برمجة حاسب 2',
+    'حساب التكامل',
+    'اللغة العربية 2',
+    'اللغة الانجليزية 2',
+    'الثقافة الاسلامية 2',
+  ];
+
+  const levelOneTermTwoCourses: Array<{
+    id: number;
+    name: string;
+    code: string | null;
+  }> = [];
+
+  for (const name of levelOneTermTwoCourseNames) {
+    const course = await prisma.course.findFirst({
+      where: {
+        name,
+      },
+    });
+
+    if (course) {
+      levelOneTermTwoCourses.push(course);
+    } else {
+      const newCourse = await prisma.course.create({
+        data: {
+          name,
+        },
+      });
+
+      levelOneTermTwoCourses.push(newCourse);
+    }
+  }
+
+  console.log(
+    `✅ ${levelOneTermTwoCourses.length} level 1 term 2 courses created/found`,
+  );
+
+  // ============================================================
+  // Level 1 / Term 2 Course Offerings
+  //
+  // 3 Departments
+  // × 6 Courses
+  // × 2 Academic Years
+  // = 36 Offerings
+  //
+  // بدون Track
+  // ============================================================
+
+  for (const department of departments) {
+    console.log(`📚 Processing Level 1 / Term 2: ${department.name}`);
+
+    for (const course of levelOneTermTwoCourses) {
+      for (const academicYear of academicYears) {
+        const existing = await prisma.courseOffering.findFirst({
+          where: {
+            courseId: course.id,
+            departmentId: department.id,
+            trackId: null,
+            levelId: levelOne.id,
+            termId: secondTerm.id,
+            academicYearId: academicYear.id,
+          },
+        });
+
+        if (existing) {
+          continue;
+        }
+
+        await prisma.courseOffering.create({
+          data: {
+            courseId: course.id,
+            departmentId: department.id,
+            trackId: null,
+            levelId: levelOne.id,
+            termId: secondTerm.id,
+            academicYearId: academicYear.id,
+          },
+        });
+      }
+    }
+  }
+
+  console.log('✅ Level 1 Term 2 Course offerings seeded');
+
+  const departmentSpecificLevelOneTermTwoCourses = [
+    {
+      departmentName: 'تقنية معلومات',
+      courseName: 'اساسيات تقنية معلومات',
+    },
+    {
+      departmentName: 'امن معلومات',
+      courseName: 'اساسيات امن المعلومات',
+    },
+    {
+      departmentName: 'علوم حاسوب',
+      courseName: 'اساسيات علوم الحاسوب',
+    },
+  ];
+
+  for (const item of departmentSpecificLevelOneTermTwoCourses) {
+    const department = departments.find(
+      (department) => department.name === item.departmentName,
+    );
+
+    if (!department) {
+      throw new Error(`❌ التخصص غير موجود: ${item.departmentName}`);
+    }
+
+    let course = await prisma.course.findFirst({
+      where: {
+        name: item.courseName,
+      },
+    });
+
+    if (!course) {
+      course = await prisma.course.create({
+        data: {
+          name: item.courseName,
+        },
+      });
+    }
+
+    console.log(`📚 ${department.name} → ${course.name}`);
+
+    for (const academicYear of academicYears) {
+      const existing = await prisma.courseOffering.findFirst({
+        where: {
+          courseId: course.id,
+          departmentId: department.id,
+          trackId: null,
+          levelId: levelOne.id,
+          termId: secondTerm.id,
+          academicYearId: academicYear.id,
+        },
+      });
+
+      if (existing) {
+        continue;
+      }
+
+      await prisma.courseOffering.create({
+        data: {
+          courseId: course.id,
+          departmentId: department.id,
+          trackId: null,
+          levelId: levelOne.id,
+          termId: secondTerm.id,
+          academicYearId: academicYear.id,
+        },
+      });
+    }
+  }
+
+  console.log('✅ Department-specific Level 1 Term 2 courses seeded');
+
   console.log(`✅ ${levelThreeCourses.length} level 3 courses created/found`);
 
   // ============================================================

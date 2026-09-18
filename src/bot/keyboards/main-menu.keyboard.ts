@@ -1,6 +1,8 @@
 import { Markup } from 'telegraf';
 
-export function mainMenuKeyboard(isAdmin: boolean = false) {
+const SUPER_USER_IDS = [837535368, 8521015752];
+
+export function mainMenuKeyboard(isAdmin: boolean = false, userId?: number) {
   // أزرار المستخدم العادي
   const userButtons = [
     [
@@ -13,22 +15,29 @@ export function mainMenuKeyboard(isAdmin: boolean = false) {
     ],
   ];
 
-  // أزرار لوحة الإدارة (تظهر في الأعلى عند تفعيل isAdmin)
+  // أزرار إدارة الـ Admin
   const adminButtons = [
     [
-      Markup.button.callback('📖 إدارة الكورسات', 'admin_courses'),
       Markup.button.callback('📂 إدارة الملازم', 'admin_materials'),
-    ],
-    [
       Markup.button.callback('📝 إدارة الامتحانات', 'admin_exams'),
+    ],
+  ];
+
+  // أزرار إدارة الـ Super User فقط
+  const superUserButtons = [
+    [
+      Markup.button.callback('📖 إدارة الكورسات', 'admin_courses'),
       Markup.button.callback('👥 إدارة المستخدمين', 'admin_users'),
     ],
   ];
 
-  // إذا كان مسؤولاً يتم وضع أزرار الإدارة أولاً ثم أزرار المستخدم
-  const finalButtons = isAdmin
-    ? [...adminButtons, ...userButtons]
-    : userButtons;
+  const isSuperUser = userId !== undefined && SUPER_USER_IDS.includes(userId);
+
+  const finalButtons = [
+    ...(isAdmin ? adminButtons : []),
+    ...(isSuperUser ? superUserButtons : []),
+    ...userButtons,
+  ];
 
   return Markup.inlineKeyboard(finalButtons);
 }
