@@ -1,8 +1,11 @@
 import { Action, Ctx, Update } from 'nestjs-telegraf';
+
 import { Context } from 'telegraf';
+
 import { ResourceType } from '@prisma/client';
 
 import { AcademicService } from 'src/academic/services/academic.services';
+
 import { ExamService } from 'src/exam/services/exam.service';
 
 @Update()
@@ -41,12 +44,14 @@ export class ExamsHandler {
     // se/{departmentId}
     if (parts.length === 2) {
       await this.showLevels(ctx, Number(parts[1]));
+
       return;
     }
 
     // se/{departmentId}/{levelId}
     if (parts.length === 3) {
       await this.showTerms(ctx, Number(parts[1]), Number(parts[2]));
+
       return;
     }
 
@@ -58,6 +63,7 @@ export class ExamsHandler {
         Number(parts[2]),
         Number(parts[3]),
       );
+
       return;
     }
 
@@ -70,6 +76,7 @@ export class ExamsHandler {
         Number(parts[3]),
         parts[4],
       );
+
       return;
     }
 
@@ -83,6 +90,7 @@ export class ExamsHandler {
         parts[4],
         Number(parts[5]),
       );
+
       return;
     }
 
@@ -97,6 +105,7 @@ export class ExamsHandler {
         Number(parts[5]),
         Number(parts[6]),
       );
+
       return;
     }
 
@@ -127,12 +136,22 @@ export class ExamsHandler {
     if (!departments.length) {
       await ctx.editMessageText(
         `
-❌ <b>لا توجد تخصصات متاحة حاليًا</b>
+<b>لا توجد تخصصات متاحة حاليًا</b>
 
 لم يتم العثور على أي تخصص يحتوي على امتحانات تعليمية.
         `.trim(),
         {
           parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: 'السابق',
+                  callback_data: 'main_menu',
+                },
+              ],
+            ],
+          },
         },
       );
 
@@ -141,23 +160,29 @@ export class ExamsHandler {
 
     await ctx.editMessageText(
       `
-📝 <b>الامتحانات السابقة</b>
+<b>الامتحانات السابقة</b>
 
-<b>الخطوة 1 من 7</b>
-
-🎓 <b>اختر التخصص</b>
+<b>اختر التخصص</b>
 
 اختر تخصصك للانتقال إلى المستويات الدراسية والامتحانات المتاحة.
       `.trim(),
       {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: departments.map((department) => [
-            {
-              text: `🎓 ${department.name}`,
-              callback_data: `se/${department.id}`,
-            },
-          ]),
+          inline_keyboard: [
+            ...departments.map((department) => [
+              {
+                text: department.name,
+                callback_data: `se/${department.id}`,
+              },
+            ]),
+            [
+              {
+                text: 'السابق',
+                callback_data: 'main_menu',
+              },
+            ],
+          ],
         },
       },
     );
@@ -172,7 +197,8 @@ export class ExamsHandler {
       await this.academicService.getDepartmentById(departmentId);
 
     if (!department) {
-      await ctx.answerCbQuery('❌ التخصص غير موجود.');
+      await ctx.answerCbQuery('التخصص غير موجود.');
+
       return;
     }
 
@@ -183,12 +209,22 @@ export class ExamsHandler {
     if (!levels.length) {
       await ctx.editMessageText(
         `
-❌ <b>لا توجد مستويات دراسية متاحة</b>
+<b>لا توجد مستويات دراسية متاحة</b>
 
 لم يتم إعداد المستويات الدراسية في النظام حتى الآن.
         `.trim(),
         {
           parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: 'السابق',
+                  callback_data: 'se',
+                },
+              ],
+            ],
+          },
         },
       );
 
@@ -197,26 +233,29 @@ export class ExamsHandler {
 
     await ctx.editMessageText(
       `
-📝 <b>الامتحانات السابقة</b>
+<b>الامتحانات السابقة</b>
 
-<b>الخطوة 2 من 7</b>
+<b>التخصص:</b> ${this.escapeHtml(department.name)}
 
-🎓 <b>التخصص:</b>
-${this.escapeHtml(department.name)}
-
-📖 <b>اختر المستوى الدراسي</b>
-
-حدد المستوى للوصول إلى الامتحانات والمقررات المتاحة.
+<b>اختر المستوى الدراسي</b>
       `.trim(),
       {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: levels.map((level) => [
-            {
-              text: `📖 ${level.name}`,
-              callback_data: `se/${departmentId}/${level.id}`,
-            },
-          ]),
+          inline_keyboard: [
+            ...levels.map((level) => [
+              {
+                text: level.name,
+                callback_data: `se/${departmentId}/${level.id}`,
+              },
+            ]),
+            [
+              {
+                text: 'السابق',
+                callback_data: 'se',
+              },
+            ],
+          ],
         },
       },
     );
@@ -227,10 +266,14 @@ ${this.escapeHtml(department.name)}
   // ============================================================
 
   private async showTerms(ctx: Context, departmentId: number, levelId: number) {
+    const department =
+      await this.academicService.getDepartmentById(departmentId);
+
     const level = await this.academicService.getLevelById(levelId);
 
-    if (!level) {
-      await ctx.answerCbQuery('❌ المستوى غير موجود.');
+    if (!department || !level) {
+      await ctx.answerCbQuery('البيانات المحددة غير صحيحة.');
+
       return;
     }
 
@@ -241,12 +284,22 @@ ${this.escapeHtml(department.name)}
     if (!terms.length) {
       await ctx.editMessageText(
         `
-❌ <b>لا توجد أترام دراسية متاحة</b>
+<b>لا توجد أترام دراسية متاحة</b>
 
 لم يتم إعداد الفصول الدراسية في النظام حتى الآن.
         `.trim(),
         {
           parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: 'السابق',
+                  callback_data: `se/${departmentId}`,
+                },
+              ],
+            ],
+          },
         },
       );
 
@@ -255,26 +308,31 @@ ${this.escapeHtml(department.name)}
 
     await ctx.editMessageText(
       `
-📝 <b>الامتحانات السابقة</b>
+<b>الامتحانات السابقة</b>
 
-<b>الخطوة 3 من 7</b>
+<b>التخصص:</b> ${this.escapeHtml(department.name)}
 
-📖 <b>المستوى:</b>
-${this.escapeHtml(level.name)}
+<b>المستوى:</b> ${this.escapeHtml(level.name)}
 
-🗓️ <b>اختر الترم الدراسي</b>
-
-حدد الترم الذي تريد عرض مقرراته وامتحاناته.
+<b>اختر الترم الدراسي</b>
       `.trim(),
       {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: terms.map((term) => [
-            {
-              text: `🗓️ ${term.name}`,
-              callback_data: `se/${departmentId}/${levelId}/${term.id}`,
-            },
-          ]),
+          inline_keyboard: [
+            ...terms.map((term) => [
+              {
+                text: term.name,
+                callback_data: `se/${departmentId}/${levelId}/${term.id}`,
+              },
+            ]),
+            [
+              {
+                text: 'السابق',
+                callback_data: `se/${departmentId}`,
+              },
+            ],
+          ],
         },
       },
     );
@@ -299,15 +357,18 @@ ${this.escapeHtml(level.name)}
     const term = await this.academicService.getTermById(termId);
 
     if (!department || !level || !term) {
-      await ctx.answerCbQuery('❌ البيانات المحددة غير صحيحة.');
+      await ctx.answerCbQuery('البيانات المحددة غير صحيحة.');
+
       return;
     }
 
     const isIT = department.name === 'تقنية معلومات';
+
     const needsTrack = isIT && (level.id === 3 || level.id === 4);
 
     if (needsTrack) {
       await this.showTracks(ctx, departmentId, levelId, termId);
+
       return;
     }
 
@@ -324,36 +385,62 @@ ${this.escapeHtml(level.name)}
     levelId: number,
     termId: number,
   ) {
+    const department =
+      await this.academicService.getDepartmentById(departmentId);
+
+    const level = await this.academicService.getLevelById(levelId);
+
+    const term = await this.academicService.getTermById(termId);
+
+    if (!department || !level || !term) {
+      await ctx.answerCbQuery('البيانات المحددة غير صحيحة.');
+
+      return;
+    }
+
     const tracks =
       await this.academicService.getTracksByDepartmentId(departmentId);
 
     await ctx.answerCbQuery();
 
+    if (!tracks.length) {
+      await this.showCourses(ctx, departmentId, levelId, termId, 'none');
+
+      return;
+    }
+
     const buttons = tracks.map((track) => [
       {
-        text: `🎯 ${track.name}`,
+        text: track.name,
         callback_data: `se/${departmentId}/${levelId}/${termId}/${track.id}`,
       },
     ]);
 
     buttons.push([
       {
-        text: '📚 بدون تراك',
+        text: 'بدون تراك',
         callback_data: `se/${departmentId}/${levelId}/${termId}/none`,
+      },
+    ]);
+
+    buttons.push([
+      {
+        text: 'السابق',
+        callback_data: `se/${departmentId}`,
       },
     ]);
 
     await ctx.editMessageText(
       `
-📝 <b>الامتحانات السابقة</b>
+<b>الامتحانات السابقة</b>
 
-<b>الخطوة 4 من 7</b>
+<b>التخصص:</b> ${this.escapeHtml(department.name)}
 
-🎯 <b>اختر التراك</b>
+<b>المستوى:</b> ${this.escapeHtml(level.name)}
 
-حدد المسار الأكاديمي الذي تريد عرض مقرراته وامتحاناته.
+<b>الترم:</b> ${this.escapeHtml(term.name)}
 
-💡 <i>إذا لم يكن المقرر مرتبطًا بتراك، اختر «بدون تراك».</i>
+<b>اختر التراك</b>
       `.trim(),
       {
         parse_mode: 'HTML',
@@ -365,7 +452,7 @@ ${this.escapeHtml(level.name)}
   }
 
   // ============================================================
-  // 6. Courses with exams only
+  // 6. Courses
   // ============================================================
 
   private async showCourses(
@@ -375,7 +462,29 @@ ${this.escapeHtml(level.name)}
     termId: number,
     trackValue: string,
   ) {
+    const department =
+      await this.academicService.getDepartmentById(departmentId);
+
+    const level = await this.academicService.getLevelById(levelId);
+
+    const term = await this.academicService.getTermById(termId);
+
+    if (!department || !level || !term) {
+      await ctx.answerCbQuery('البيانات المحددة غير صحيحة.');
+
+      return;
+    }
+
     const trackId = trackValue === 'none' ? undefined : Number(trackValue);
+
+    let trackName: string | undefined;
+
+    if (trackId !== undefined) {
+      const tracks =
+        await this.academicService.getTracksByDepartmentId(departmentId);
+
+      trackName = tracks.find((track) => track.id === trackId)?.name;
+    }
 
     const courses = await this.examService.getCoursesWithExams({
       departmentId,
@@ -389,46 +498,77 @@ ${this.escapeHtml(level.name)}
     if (!courses.length) {
       await ctx.editMessageText(
         `
-❌ <b>لا توجد مقررات تحتوي على امتحانات</b>
+<b>لا توجد مقررات تحتوي على امتحانات</b>
+
+<b>التخصص:</b> ${this.escapeHtml(department.name)}
+
+<b>المستوى:</b> ${this.escapeHtml(level.name)}
+
+<b>الترم:</b> ${this.escapeHtml(term.name)}
 
 لم يتم العثور على امتحانات متاحة لهذا الاختيار.
-
-💡 <i>يمكنك الرجوع واختيار تخصص أو مستوى أو ترم آخر.</i>
         `.trim(),
         {
           parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: 'السابق',
+                  callback_data: `se/${departmentId}`,
+                },
+              ],
+            ],
+          },
         },
       );
 
       return;
     }
 
+    const contextLines = [
+      `<b>التخصص:</b> ${this.escapeHtml(department.name)}`,
+      `<b>المستوى:</b> ${this.escapeHtml(level.name)}`,
+      `<b>الترم:</b> ${this.escapeHtml(term.name)}`,
+    ];
+
+    if (trackName) {
+      contextLines.push(`<b>التراك:</b> ${this.escapeHtml(trackName)}`);
+    }
+
+    contextLines.push('');
+    contextLines.push('<b>اختر المقرر</b>');
+
     await ctx.editMessageText(
       `
-📝 <b>الامتحانات السابقة</b>
+<b>الامتحانات السابقة</b>
 
-<b>الخطوة 5 من 7</b>
-
-📚 <b>اختر المقرر</b>
-
-اختر المقرر الذي تريد استعراض امتحاناته السابقة.
+${contextLines.join('\n')}
       `.trim(),
       {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: courses.map((course) => [
-            {
-              text: `📘 ${course.name}`,
-              callback_data: `se/${departmentId}/${levelId}/${termId}/${trackValue}/${course.id}`,
-            },
-          ]),
+          inline_keyboard: [
+            ...courses.map((course) => [
+              {
+                text: course.name,
+                callback_data: `se/${departmentId}/${levelId}/${termId}/${trackValue}/${course.id}`,
+              },
+            ]),
+            [
+              {
+                text: 'السابق',
+                callback_data: `se/${departmentId}`,
+              },
+            ],
+          ],
         },
       },
     );
   }
 
   // ============================================================
-  // 7. Academic years with exams only
+  // 7. Academic years
   // ============================================================
 
   private async showAcademicYears(
@@ -439,7 +579,44 @@ ${this.escapeHtml(level.name)}
     trackValue: string,
     courseId: number,
   ) {
+    const department =
+      await this.academicService.getDepartmentById(departmentId);
+
+    const level = await this.academicService.getLevelById(levelId);
+
+    const term = await this.academicService.getTermById(termId);
+
+    if (!department || !level || !term) {
+      await ctx.answerCbQuery('البيانات المحددة غير صحيحة.');
+
+      return;
+    }
+
     const trackId = trackValue === 'none' ? undefined : Number(trackValue);
+
+    let trackName: string | undefined;
+
+    if (trackId !== undefined) {
+      const tracks =
+        await this.academicService.getTracksByDepartmentId(departmentId);
+
+      trackName = tracks.find((track) => track.id === trackId)?.name;
+    }
+
+    const courses = await this.examService.getCoursesWithExams({
+      departmentId,
+      levelId,
+      termId,
+      trackId,
+    });
+
+    const course = courses.find((item) => item.id === courseId);
+
+    if (!course) {
+      await ctx.answerCbQuery('المقرر غير موجود.');
+
+      return;
+    }
 
     const offerings = await this.examService.getCourseOfferingsWithExams({
       courseId,
@@ -454,40 +631,78 @@ ${this.escapeHtml(level.name)}
     if (!offerings.length) {
       await ctx.editMessageText(
         `
-❌ <b>لا توجد امتحانات لهذا المقرر</b>
+<b>لا توجد امتحانات لهذا المقرر</b>
+
+<b>التخصص:</b> ${this.escapeHtml(department.name)}
+
+<b>المستوى:</b> ${this.escapeHtml(level.name)}
+
+<b>الترم:</b> ${this.escapeHtml(term.name)}
+
+<b>المقرر:</b> ${this.escapeHtml(course.name)}
 
 لم يتم العثور على سنوات دراسية تحتوي على امتحانات متاحة.
         `.trim(),
         {
           parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: 'السابق',
+                  callback_data: `se/${departmentId}`,
+                },
+              ],
+            ],
+          },
         },
       );
 
       return;
     }
 
+    const contextLines = [
+      `<b>التخصص:</b> ${this.escapeHtml(department.name)}`,
+      `<b>المستوى:</b> ${this.escapeHtml(level.name)}`,
+      `<b>الترم:</b> ${this.escapeHtml(term.name)}`,
+    ];
+
+    if (trackName) {
+      contextLines.push(`<b>التراك:</b> ${this.escapeHtml(trackName)}`);
+    }
+
+    contextLines.push(
+      `<b>المقرر:</b> ${this.escapeHtml(course.name)}`,
+      '',
+      '<b>اختر السنة الدراسية</b>',
+    );
+
     await ctx.editMessageText(
       `
-📝 <b>الامتحانات السابقة</b>
+<b>الامتحانات السابقة</b>
 
-<b>الخطوة 6 من 7</b>
-
-📅 <b>اختر السنة الدراسية</b>
-
-حدد السنة الدراسية التي تريد استعراض امتحاناتها.
+${contextLines.join('\n')}
       `.trim(),
       {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: offerings.map((offering) => [
-            {
-              text: `📅 ${this.formatAcademicYear(
-                offering.academicYear.startYear,
-                offering.academicYear.endYear,
-              )}`,
-              callback_data: `se/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}/${offering.academicYearId}`,
-            },
-          ]),
+          inline_keyboard: [
+            ...offerings.map((offering) => [
+              {
+                text: this.formatAcademicYear(
+                  offering.academicYear.startYear,
+                  offering.academicYear.endYear,
+                ),
+                callback_data: `se/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}/${offering.academicYearId}`,
+              },
+            ]),
+            [
+              {
+                text: 'السابق',
+                callback_data: `se/${departmentId}`,
+              },
+            ],
+          ],
         },
       },
     );
@@ -506,7 +721,44 @@ ${this.escapeHtml(level.name)}
     courseId: number,
     academicYearId: number,
   ) {
+    const department =
+      await this.academicService.getDepartmentById(departmentId);
+
+    const level = await this.academicService.getLevelById(levelId);
+
+    const term = await this.academicService.getTermById(termId);
+
+    if (!department || !level || !term) {
+      await ctx.answerCbQuery('البيانات المحددة غير صحيحة.');
+
+      return;
+    }
+
     const trackId = trackValue === 'none' ? undefined : Number(trackValue);
+
+    let trackName: string | undefined;
+
+    if (trackId !== undefined) {
+      const tracks =
+        await this.academicService.getTracksByDepartmentId(departmentId);
+
+      trackName = tracks.find((track) => track.id === trackId)?.name;
+    }
+
+    const courses = await this.examService.getCoursesWithExams({
+      departmentId,
+      levelId,
+      termId,
+      trackId,
+    });
+
+    const course = courses.find((item) => item.id === courseId);
+
+    if (!course) {
+      await ctx.answerCbQuery('المقرر غير موجود.');
+
+      return;
+    }
 
     const offerings = await this.examService.getCourseOfferingsWithExams({
       courseId,
@@ -521,7 +773,8 @@ ${this.escapeHtml(level.name)}
     );
 
     if (!offering) {
-      await ctx.answerCbQuery('❌ السنة الدراسية غير موجودة.');
+      await ctx.answerCbQuery('السنة الدراسية غير موجودة.');
+
       return;
     }
 
@@ -532,37 +785,84 @@ ${this.escapeHtml(level.name)}
     if (!types.length) {
       await ctx.editMessageText(
         `
-❌ <b>لا توجد امتحانات متاحة</b>
+<b>لا توجد امتحانات متاحة</b>
+
+<b>التخصص:</b> ${this.escapeHtml(department.name)}
+
+<b>المستوى:</b> ${this.escapeHtml(level.name)}
+
+<b>الترم:</b> ${this.escapeHtml(term.name)}
+
+<b>المقرر:</b> ${this.escapeHtml(course.name)}
+
+<b>السنة:</b> ${this.formatAcademicYear(
+          offering.academicYear.startYear,
+          offering.academicYear.endYear,
+        )}
 
 لم يتم العثور على أنواع امتحانات متاحة لهذا الاختيار.
         `.trim(),
         {
           parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: 'السابق',
+                  callback_data: `se/${departmentId}`,
+                },
+              ],
+            ],
+          },
         },
       );
 
       return;
     }
 
+    const contextLines = [
+      `<b>التخصص:</b> ${this.escapeHtml(department.name)}`,
+      `<b>المستوى:</b> ${this.escapeHtml(level.name)}`,
+      `<b>الترم:</b> ${this.escapeHtml(term.name)}`,
+    ];
+
+    if (trackName) {
+      contextLines.push(`<b>التراك:</b> ${this.escapeHtml(trackName)}`);
+    }
+
+    contextLines.push(
+      `<b>المقرر:</b> ${this.escapeHtml(course.name)}`,
+      `<b>السنة:</b> ${this.formatAcademicYear(
+        offering.academicYear.startYear,
+        offering.academicYear.endYear,
+      )}`,
+      '',
+      '<b>اختر نوع الامتحان</b>',
+    );
+
     await ctx.editMessageText(
       `
-📝 <b>الامتحانات السابقة</b>
+<b>الامتحانات السابقة</b>
 
-<b>الخطوة 7 من 7</b>
-
-📂 <b>اختر نوع الامتحان</b>
-
-حدد نوع الامتحان الذي تريد استلام ملفاته.
+${contextLines.join('\n')}
       `.trim(),
       {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: types.map((type) => [
-            {
-              text: this.getTypeLabel(type),
-              callback_data: `se/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}/${academicYearId}/${type}`,
-            },
-          ]),
+          inline_keyboard: [
+            ...types.map((type) => [
+              {
+                text: this.getTypeLabel(type),
+                callback_data: `se/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}/${academicYearId}/${type}`,
+              },
+            ]),
+            [
+              {
+                text: 'السابق',
+                callback_data: `se/${departmentId}`,
+              },
+            ],
+          ],
         },
       },
     );
@@ -588,7 +888,8 @@ ${this.escapeHtml(level.name)}
       typeValue !== ResourceType.THEORY &&
       typeValue !== ResourceType.PRACTICAL
     ) {
-      await ctx.answerCbQuery('❌ نوع الامتحان غير صحيح.');
+      await ctx.answerCbQuery('نوع الامتحان غير صحيح.');
+
       return;
     }
 
@@ -605,7 +906,8 @@ ${this.escapeHtml(level.name)}
     );
 
     if (!offering) {
-      await ctx.answerCbQuery('❌ لم يتم العثور على المقرر.');
+      await ctx.answerCbQuery('لم يتم العثور على المقرر.');
+
       return;
     }
 
@@ -616,7 +918,7 @@ ${this.escapeHtml(level.name)}
     if (!exams.length) {
       await ctx.editMessageText(
         `
-❌ <b>لا توجد امتحانات متاحة</b>
+<b>لا توجد امتحانات متاحة</b>
 
 لم يتم العثور على امتحانات من نوع
 <b>${this.getTypeLabel(typeValue)}</b>
@@ -624,20 +926,28 @@ ${this.escapeHtml(level.name)}
         `.trim(),
         {
           parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: 'السابق',
+                  callback_data: `se/${departmentId}`,
+                },
+              ],
+            ],
+          },
         },
       );
 
       return;
     }
 
-    // رسالة حالة الإرسال
+    // Show sending status.
     await ctx.editMessageText(
       `
-📝 <b>جاري تجهيز الامتحانات</b>
+<b>جاري إرسال الامتحانات...</b>
 
-تم العثور على <b>${exams.length}</b> امتحان.
-
-⏳ <i>يرجى الانتظار... سيتم إرسال الملفات واحدًا تلو الآخر.</i>
+<i>يتم الآن إرسال الملفات، يرجى الانتظار.</i>
       `.trim(),
       {
         parse_mode: 'HTML',
@@ -647,6 +957,7 @@ ${this.escapeHtml(level.name)}
     let sentCount = 0;
     let failedCount = 0;
 
+    // Copy every exam from the Telegram storage channel.
     for (const exam of exams) {
       try {
         await ctx.telegram.copyMessage(
@@ -665,9 +976,9 @@ ${this.escapeHtml(level.name)}
           await ctx.telegram.sendMessage(
             ctx.chat!.id,
             `
-⚠️ <b>تعذر إرسال أحد الامتحانات</b>
+<b>تعذر إرسال أحد الامتحانات</b>
 
-📝 <b>${this.escapeHtml(exam.title)}</b>
+<b>${this.escapeHtml(exam.title)}</b>
 
 <i>حدث خطأ أثناء إرسال هذا الملف، ويمكنك المحاولة مرة أخرى لاحقًا.</i>
             `.trim(),
@@ -692,14 +1003,30 @@ ${this.escapeHtml(level.name)}
       await ctx.telegram.sendMessage(
         ctx.chat!.id,
         `
-✅ <b>تم إرسال جميع الامتحانات بنجاح</b>
+<b>تم إرسال الامتحانات بنجاح</b>
 
-📝 <b>عدد الملفات:</b> ${sentCount}
+<b>عدد الملفات:</b> ${sentCount}
 
-يمكنك الآن فتح الملفات مباشرة من المحادثة.
+<i>يمكنك الآن فتح الملفات مباشرة من المحادثة.</i>
         `.trim(),
         {
           parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: 'السابق',
+                  callback_data: `se/${departmentId}`,
+                },
+              ],
+              [
+                {
+                  text: 'الرئيسية',
+                  callback_data: 'main_menu',
+                },
+              ],
+            ],
+          },
         },
       );
 
@@ -709,16 +1036,34 @@ ${this.escapeHtml(level.name)}
     await ctx.telegram.sendMessage(
       ctx.chat!.id,
       `
-⚠️ <b>اكتمل إرسال الامتحانات</b>
+<b>اكتمل إرسال الامتحانات</b>
 
-📝 <b>إجمالي الملفات:</b> ${exams.length}
-✅ <b>تم إرسال:</b> ${sentCount}
-❌ <b>تعذر إرسال:</b> ${failedCount}
+<b>إجمالي الملفات:</b> ${exams.length}
+
+<b>تم إرسال:</b> ${sentCount}
+
+<b>تعذر إرسال:</b> ${failedCount}
 
 <i>يمكنك إعادة المحاولة لإرسال الملفات التي تعذر إرسالها.</i>
       `.trim(),
       {
         parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: 'السابق',
+                callback_data: `se/${departmentId}`,
+              },
+            ],
+            [
+              {
+                text: 'الرئيسية',
+                callback_data: 'main_menu',
+              },
+            ],
+          ],
+        },
       },
     );
   }
@@ -730,10 +1075,10 @@ ${this.escapeHtml(level.name)}
   private getTypeLabel(type: ResourceType): string {
     switch (type) {
       case ResourceType.THEORY:
-        return '📘 نظري';
+        return 'نظري';
 
       case ResourceType.PRACTICAL:
-        return '🧪 عملي';
+        return 'عملي';
 
       default:
         return type;

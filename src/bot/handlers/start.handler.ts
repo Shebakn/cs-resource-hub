@@ -4,10 +4,13 @@ import { Context } from 'telegraf';
 
 import { UsersService } from 'src/user/services/user.service';
 import { mainMenuKeyboard } from '../keyboards/main-menu.keyboard';
-
+import { BotEventService } from '../services/bot-event.service';
 @Update()
 export class StartHandler {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly botEventService: BotEventService,
+  ) {}
 
   @Start()
   async onStart(@Ctx() ctx: Context) {
@@ -55,6 +58,10 @@ export class StartHandler {
     await ctx.answerCbQuery();
 
     const telegramId = ctx.from.id.toString();
+
+    // إلغاء أي عملية/حدث جاري للمستخدم
+    this.botEventService.delete(ctx.from.id);
+
     const isAdmin = await this.usersService.isAdmin(telegramId);
 
     const messageText = `
@@ -63,7 +70,7 @@ export class StartHandler {
 مرحبًا بك مجددًا! 👋
 
 اختر من القائمة أدناه للوصول إلى القسم المطلوب:
-    `.trim();
+  `.trim();
 
     await ctx.editMessageText(messageText, {
       parse_mode: 'HTML',

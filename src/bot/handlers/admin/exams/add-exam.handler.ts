@@ -10,9 +10,10 @@ import { Prisma, ResourceType } from '@prisma/client';
 
 import { AcademicService } from 'src/academic/services/academic.services';
 
-import { BotEventService } from 'src/bot/services/bot-event.service';
-
-import { BotEventType } from 'src/bot/services/bot-event.service';
+import {
+  BotEventService,
+  BotEventType,
+} from 'src/bot/services/bot-event.service';
 
 import { ExamService } from 'src/exam/services/exam.service';
 
@@ -81,18 +82,57 @@ export class AddExamHandler {
 
     await ctx.answerCbQuery();
 
-    // ==========================================================
+    // =========================================================
+    // Cancel
+    // ae/cancel
+    // =========================================================
+
+    if (callbackData === 'ae/cancel') {
+      this.botEventService.delete(this.getUserId(ctx));
+
+      await this.editOrReply(
+        ctx,
+        '<b>تم إلغاء العملية.</b>',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🏠 الرئيسية', 'main_menu')],
+        ]),
+      );
+
+      return;
+    }
+
+    // =========================================================
+    // Back
+    // ae/back/departmentId/levelId
+    //
+    // Used when trackValue === none.
+    // =========================================================
+
+    if (parts.length === 4 && parts[1] === 'back') {
+      const departmentId = Number(parts[2]);
+      const levelId = Number(parts[3]);
+
+      if (!Number.isInteger(departmentId) || !Number.isInteger(levelId)) {
+        await this.editOrReply(ctx, '❌ البيانات غير صحيحة.');
+        return;
+      }
+
+      await this.handleLevel(ctx, departmentId, levelId);
+      return;
+    }
+
+    // =========================================================
     // ae
-    // ==========================================================
+    // =========================================================
 
     if (parts.length === 1) {
       await this.start(ctx);
       return;
     }
 
-    // ==========================================================
+    // =========================================================
     // ae/departmentId
-    // ==========================================================
+    // =========================================================
 
     if (parts.length === 2) {
       const departmentId = Number(parts[1]);
@@ -106,9 +146,9 @@ export class AddExamHandler {
       return;
     }
 
-    // ==========================================================
+    // =========================================================
     // ae/departmentId/levelId
-    // ==========================================================
+    // =========================================================
 
     if (parts.length === 3) {
       const departmentId = Number(parts[1]);
@@ -123,9 +163,9 @@ export class AddExamHandler {
       return;
     }
 
-    // ==========================================================
+    // =========================================================
     // ae/departmentId/levelId/termId
-    // ==========================================================
+    // =========================================================
 
     if (parts.length === 4) {
       const departmentId = Number(parts[1]);
@@ -146,9 +186,9 @@ export class AddExamHandler {
       return;
     }
 
-    // ==========================================================
-    // ae/departmentId/levelId/termId/trackId
-    // ==========================================================
+    // =========================================================
+    // ae/departmentId/levelId/termId/trackValue
+    // =========================================================
 
     if (parts.length === 5) {
       const departmentId = Number(parts[1]);
@@ -176,9 +216,9 @@ export class AddExamHandler {
       return;
     }
 
-    // ==========================================================
-    // ae/departmentId/levelId/termId/trackId/courseId
-    // ==========================================================
+    // =========================================================
+    // ae/.../trackValue/courseId
+    // =========================================================
 
     if (parts.length === 6) {
       const departmentId = Number(parts[1]);
@@ -209,9 +249,9 @@ export class AddExamHandler {
       return;
     }
 
-    // ==========================================================
+    // =========================================================
     // ae/.../courseId/academicYearId
-    // ==========================================================
+    // =========================================================
 
     if (parts.length === 7) {
       const departmentId = Number(parts[1]);
@@ -245,10 +285,10 @@ export class AddExamHandler {
       return;
     }
 
-    // ==========================================================
+    // =========================================================
     // ae/.../academicYearId/T
     // ae/.../academicYearId/P
-    // ==========================================================
+    // =========================================================
 
     if (parts.length === 8) {
       const departmentId = Number(parts[1]);
@@ -298,6 +338,7 @@ export class AddExamHandler {
 
     if (existingEvent) {
       await this.botEventConflictService.showConflict(ctx, existingEvent);
+
       return;
     }
 
@@ -327,12 +368,21 @@ export class AddExamHandler {
 
     await this.editOrReply(
       ctx,
-      '🎓 <b>إضافة اختبار</b>\n\nاختر التخصص:',
-      Markup.inlineKeyboard(
-        departments.map((department) => [
+      [
+        '<b>📝 إضافة اختبار</b>',
+        '',
+        '<b>الخطوة 1 من 7</b>',
+        '',
+        '<b>اختر التخصص</b>',
+        '',
+        'اختر التخصص الذي تريد إضافة الاختبار إليه.',
+      ].join('\n'),
+      Markup.inlineKeyboard([
+        ...departments.map((department) => [
           Markup.button.callback(department.name, `ae/${department.id}`),
         ]),
-      ),
+        [Markup.button.callback('🏠 الرئيسية', 'main_menu')],
+      ]),
     );
   }
 
@@ -346,6 +396,7 @@ export class AddExamHandler {
 
     if (!department) {
       await this.editOrReply(ctx, '❌ التخصص غير موجود.');
+
       return;
     }
 
@@ -353,6 +404,7 @@ export class AddExamHandler {
 
     this.botEventService.update(this.getUserId(ctx), {
       event: BotEventType.WAITING_EXAM_LEVEL,
+
       data: {
         ...(event?.data ?? {}),
         departmentId,
@@ -371,6 +423,7 @@ export class AddExamHandler {
 
     if (!levels.length) {
       await this.editOrReply(ctx, '❌ لا توجد مستويات.');
+
       return;
     }
 
@@ -378,14 +431,28 @@ export class AddExamHandler {
 
     const departmentId = this.getNumber(event?.data?.departmentId);
 
+    const department =
+      await this.academicService.getDepartmentById(departmentId);
+
     await this.editOrReply(
       ctx,
-      '📚 <b>إضافة اختبار</b>\n\nاختر المستوى:',
-      Markup.inlineKeyboard(
-        levels.map((level) => [
+      [
+        '<b>📝 إضافة اختبار</b>',
+        '',
+        '<b>التخصص:</b> ' + this.escapeHtml(department?.name ?? 'غير محدد'),
+        '',
+        '<b>الخطوة 2 من 7</b>',
+        '',
+        '<b>اختر المستوى</b>',
+        '',
+        'اختر المستوى الذي تريد إضافة الاختبار إليه.',
+      ].join('\n'),
+      Markup.inlineKeyboard([
+        ...levels.map((level) => [
           Markup.button.callback(level.name, `ae/${departmentId}/${level.id}`),
         ]),
-      ),
+        [Markup.button.callback('السابق', `ae/${departmentId}`)],
+      ]),
     );
   }
 
@@ -405,17 +472,19 @@ export class AddExamHandler {
 
     if (!department || !level) {
       await this.editOrReply(ctx, '❌ التخصص أو المستوى غير موجود.');
+
       return;
     }
 
     const event = this.botEventService.get(this.getUserId(ctx));
 
     const hasTrack =
-      department.name === 'تقنية معلومات' &&
+      department.name === 'تقنية المعلومات' &&
       (level.number === 3 || level.number === 4);
 
     this.botEventService.update(this.getUserId(ctx), {
       event: BotEventType.WAITING_EXAM_TERM,
+
       data: {
         ...(event?.data ?? {}),
         departmentId,
@@ -425,6 +494,7 @@ export class AddExamHandler {
 
     if (hasTrack) {
       await this.showTermsWithTrack(ctx, departmentId, levelId);
+
       return;
     }
 
@@ -444,20 +514,38 @@ export class AddExamHandler {
 
     if (!terms.length) {
       await this.editOrReply(ctx, '❌ لا توجد أترام.');
+
       return;
     }
 
+    const department =
+      await this.academicService.getDepartmentById(departmentId);
+
+    const level = await this.academicService.getLevelById(levelId);
+
     await this.editOrReply(
       ctx,
-      '📖 <b>إضافة اختبار</b>\n\nاختر الترم:',
-      Markup.inlineKeyboard(
-        terms.map((term) => [
+      [
+        '<b>📝 إضافة اختبار</b>',
+        '',
+        `<b>التخصص:</b> ${this.escapeHtml(department?.name ?? 'غير محدد')}`,
+        `<b>المستوى:</b> ${this.escapeHtml(level?.name ?? 'غير محدد')}`,
+        '',
+        '<b>الخطوة 3 من 7</b>',
+        '',
+        '<b>اختر الترم</b>',
+        '',
+        'اختر الترم الذي تريد إضافة الاختبار إليه.',
+      ].join('\n'),
+      Markup.inlineKeyboard([
+        ...terms.map((term) => [
           Markup.button.callback(
             term.name,
             `ae/${departmentId}/${levelId}/${term.id}`,
           ),
         ]),
-      ),
+        [Markup.button.callback('السابق', `ae/${departmentId}/${levelId}`)],
+      ]),
     );
   }
 
@@ -474,20 +562,38 @@ export class AddExamHandler {
 
     if (!terms.length) {
       await this.editOrReply(ctx, '❌ لا توجد أترام.');
+
       return;
     }
 
+    const department =
+      await this.academicService.getDepartmentById(departmentId);
+
+    const level = await this.academicService.getLevelById(levelId);
+
     await this.editOrReply(
       ctx,
-      '📖 <b>إضافة اختبار</b>\n\nاختر الترم:',
-      Markup.inlineKeyboard(
-        terms.map((term) => [
+      [
+        '<b>📝 إضافة اختبار</b>',
+        '',
+        `<b>التخصص:</b> ${this.escapeHtml(department?.name ?? 'غير محدد')}`,
+        `<b>المستوى:</b> ${this.escapeHtml(level?.name ?? 'غير محدد')}`,
+        '',
+        '<b>الخطوة 3 من 7</b>',
+        '',
+        '<b>اختر الترم</b>',
+        '',
+        'اختر الترم الذي تريد إضافة الاختبار إليه.',
+      ].join('\n'),
+      Markup.inlineKeyboard([
+        ...terms.map((term) => [
           Markup.button.callback(
             term.name,
             `ae/${departmentId}/${levelId}/${term.id}/none`,
           ),
         ]),
-      ),
+        [Markup.button.callback('السابق', `ae/${departmentId}/${levelId}`)],
+      ]),
     );
   }
 
@@ -510,12 +616,17 @@ export class AddExamHandler {
 
     if (!department || !level || !term) {
       await this.editOrReply(ctx, '❌ بيانات الاختيار غير صحيحة.');
+
       return;
     }
 
     const hasTrack =
-      department.name === 'تقنية معلومات' &&
+      department.name === 'تقنية المعلومات' &&
       (level.number === 3 || level.number === 4);
+
+    // =========================================================
+    // WITHOUT TRACK
+    // =========================================================
 
     if (!hasTrack) {
       await this.handleTermWithTrack(
@@ -525,8 +636,13 @@ export class AddExamHandler {
         termId,
         'none',
       );
+
       return;
     }
+
+    // =========================================================
+    // WITH TRACK
+    // =========================================================
 
     const tracks =
       await this.academicService.getTracksByDepartmentId(departmentId);
@@ -545,10 +661,15 @@ export class AddExamHandler {
       ),
     ]);
 
+    buttons.push([
+      Markup.button.callback('السابق', `ae/${departmentId}/${levelId}`),
+    ]);
+
     const event = this.botEventService.get(this.getUserId(ctx));
 
     this.botEventService.update(this.getUserId(ctx), {
       event: BotEventType.WAITING_EXAM_TRACK,
+
       data: {
         ...(event?.data ?? {}),
         departmentId,
@@ -559,7 +680,19 @@ export class AddExamHandler {
 
     await this.editOrReply(
       ctx,
-      '🎯 <b>إضافة اختبار</b>\n\nاختر التراك:',
+      [
+        '<b>📝 إضافة اختبار</b>',
+        '',
+        `<b>التخصص:</b> ${this.escapeHtml(department.name)}`,
+        `<b>المستوى:</b> ${this.escapeHtml(level.name)}`,
+        `<b>الترم:</b> ${this.escapeHtml(term.name)}`,
+        '',
+        '<b>الخطوة 4 من 7</b>',
+        '',
+        '<b>اختر التراك</b>',
+        '',
+        'اختر التخصص الفرعي الذي تريد إضافة الاختبار إليه.',
+      ].join('\n'),
       Markup.inlineKeyboard(buttons),
     );
   }
@@ -584,20 +717,24 @@ export class AddExamHandler {
 
     if (!department || !level || !term) {
       await this.editOrReply(ctx, '❌ بيانات الاختيار غير صحيحة.');
+
       return;
     }
 
-    // ==========================================================
-    // Validate Track
-    // ==========================================================
+    // =========================================================
+    // Track
+    // =========================================================
 
     let trackId: number | undefined;
+
+    let trackName = 'بدون تراك';
 
     if (trackValue !== 'none') {
       trackId = Number(trackValue);
 
       if (!Number.isInteger(trackId)) {
         await this.editOrReply(ctx, '❌ التراك غير صحيح.');
+
         return;
       }
 
@@ -605,20 +742,39 @@ export class AddExamHandler {
 
       if (!track) {
         await this.editOrReply(ctx, '❌ التراك غير موجود.');
+
         return;
       }
+
+      trackName = track.name;
     }
 
-    // ==========================================================
-    // Get Courses
-    // ==========================================================
+    // =========================================================
+    // Academic Years
+    // =========================================================
 
     const academicYears = await this.academicService.getAcademicYears();
 
+    const previousCallback =
+      trackValue === 'none'
+        ? `ae/back/${departmentId}/${levelId}`
+        : `ae/${departmentId}/${levelId}/${termId}`;
+
     if (!academicYears.length) {
-      await this.editOrReply(ctx, '❌ لا توجد سنوات دراسية.');
+      await this.editOrReply(
+        ctx,
+        '❌ لا توجد سنوات دراسية.',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('السابق', previousCallback)],
+        ]),
+      );
+
       return;
     }
+
+    // =========================================================
+    // Get Offerings
+    // =========================================================
 
     const offerings: CourseOfferingWithRelations[] = [];
 
@@ -634,14 +790,34 @@ export class AddExamHandler {
       offerings.push(...yearOfferings);
     }
 
+    // =========================================================
+    // No Courses
+    // =========================================================
+
     if (!offerings.length) {
-      await this.editOrReply(ctx, '❌ لا توجد مواد لهذا الاختيار.');
+      await this.editOrReply(
+        ctx,
+        [
+          '<b>📝 إضافة اختبار</b>',
+          '',
+          `<b>التخصص:</b> ${this.escapeHtml(department.name)}`,
+          `<b>المستوى:</b> ${this.escapeHtml(level.name)}`,
+          `<b>الترم:</b> ${this.escapeHtml(term.name)}`,
+          `<b>التراك:</b> ${this.escapeHtml(trackName)}`,
+          '',
+          '❌ لا توجد مواد لهذا الاختيار.',
+        ].join('\n'),
+        Markup.inlineKeyboard([
+          [Markup.button.callback('السابق', previousCallback)],
+        ]),
+      );
+
       return;
     }
 
-    // ==========================================================
-    // Remove Duplicate Courses
-    // ==========================================================
+    // =========================================================
+    // Unique Courses
+    // =========================================================
 
     const uniqueCourses = new Map<number, CourseOfferingWithRelations>();
 
@@ -653,14 +829,15 @@ export class AddExamHandler {
 
     const courses = Array.from(uniqueCourses.values());
 
-    // ==========================================================
+    // =========================================================
     // Event
-    // ==========================================================
+    // =========================================================
 
     const event = this.botEventService.get(this.getUserId(ctx));
 
     this.botEventService.update(this.getUserId(ctx), {
       event: BotEventType.WAITING_EXAM_COURSE,
+
       data: {
         ...(event?.data ?? {}),
         departmentId,
@@ -670,21 +847,35 @@ export class AddExamHandler {
       },
     });
 
-    // ==========================================================
+    // =========================================================
     // Show Courses
-    // ==========================================================
+    // =========================================================
 
     await this.editOrReply(
       ctx,
-      '📚 <b>إضافة اختبار</b>\n\nاختر المادة:',
-      Markup.inlineKeyboard(
-        courses.map((offering) => [
+      [
+        '<b>📝 إضافة اختبار</b>',
+        '',
+        `<b>التخصص:</b> ${this.escapeHtml(department.name)}`,
+        `<b>المستوى:</b> ${this.escapeHtml(level.name)}`,
+        `<b>الترم:</b> ${this.escapeHtml(term.name)}`,
+        `<b>التراك:</b> ${this.escapeHtml(trackName)}`,
+        '',
+        '<b>الخطوة 5 من 7</b>',
+        '',
+        '<b>اختر المادة</b>',
+        '',
+        'اختر المادة التي تريد إضافة الاختبار إليها.',
+      ].join('\n'),
+      Markup.inlineKeyboard([
+        ...courses.map((offering) => [
           Markup.button.callback(
             offering.course.name,
             `ae/${departmentId}/${levelId}/${termId}/${trackValue}/${offering.courseId}`,
           ),
         ]),
-      ),
+        [Markup.button.callback('السابق', previousCallback)],
+      ]),
     );
   }
 
@@ -702,19 +893,48 @@ export class AddExamHandler {
   ) {
     let trackId: number | undefined;
 
+    let trackName = 'بدون تراك';
+
     if (trackValue !== 'none') {
       trackId = Number(trackValue);
 
       if (!Number.isInteger(trackId)) {
         await this.editOrReply(ctx, '❌ التراك غير صحيح.');
+
         return;
       }
+
+      const track = await this.academicService.getTrackById(trackId);
+
+      if (!track) {
+        await this.editOrReply(ctx, '❌ التراك غير موجود.');
+
+        return;
+      }
+
+      trackName = track.name;
     }
+
+    const department =
+      await this.academicService.getDepartmentById(departmentId);
+
+    const level = await this.academicService.getLevelById(levelId);
+
+    const term = await this.academicService.getTermById(termId);
 
     const academicYears = await this.academicService.getAcademicYears();
 
+    const previousCallback = `ae/${departmentId}/${levelId}/${termId}/${trackValue}`;
+
     if (!academicYears.length) {
-      await this.editOrReply(ctx, '❌ لا توجد سنوات دراسية.');
+      await this.editOrReply(
+        ctx,
+        '❌ لا توجد سنوات دراسية.',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('السابق', previousCallback)],
+        ]),
+      );
+
       return;
     }
 
@@ -740,7 +960,14 @@ export class AddExamHandler {
     }
 
     if (!availableYears.length) {
-      await this.editOrReply(ctx, '❌ لا توجد سنوات دراسية لهذه المادة.');
+      await this.editOrReply(
+        ctx,
+        '❌ لا توجد سنوات دراسية لهذه المادة.',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('السابق', previousCallback)],
+        ]),
+      );
+
       return;
     }
 
@@ -750,6 +977,7 @@ export class AddExamHandler {
 
     this.botEventService.update(this.getUserId(ctx), {
       event: BotEventType.WAITING_EXAM_ACADEMIC_YEAR,
+
       data: {
         ...(event?.data ?? {}),
         departmentId,
@@ -760,17 +988,46 @@ export class AddExamHandler {
       },
     });
 
+    const courseName =
+      availableYears.length > 0
+        ? ((
+            await this.academicService.findCourseOffering({
+              courseId,
+              departmentId,
+              levelId,
+              termId,
+              trackId,
+              academicYearId: availableYears[0].id,
+            })
+          )?.course.name ?? 'غير محدد')
+        : 'غير محدد';
+
     await this.editOrReply(
       ctx,
-      '📅 <b>إضافة اختبار</b>\n\nاختر السنة الدراسية:',
-      Markup.inlineKeyboard(
-        availableYears.map((year) => [
+      [
+        '<b>📝 إضافة اختبار</b>',
+        '',
+        `<b>التخصص:</b> ${this.escapeHtml(department?.name ?? 'غير محدد')}`,
+        `<b>المستوى:</b> ${this.escapeHtml(level?.name ?? 'غير محدد')}`,
+        `<b>الترم:</b> ${this.escapeHtml(term?.name ?? 'غير محدد')}`,
+        `<b>التراك:</b> ${this.escapeHtml(trackName)}`,
+        `<b>المادة:</b> ${this.escapeHtml(courseName)}`,
+        '',
+        '<b>الخطوة 6 من 7</b>',
+        '',
+        '<b>اختر السنة الدراسية</b>',
+        '',
+        'اختر السنة التي يتبع لها الاختبار.',
+      ].join('\n'),
+      Markup.inlineKeyboard([
+        ...availableYears.map((year) => [
           Markup.button.callback(
             `${year.startYear} - ${year.endYear}`,
             `ae/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}/${year.id}`,
           ),
         ]),
-      ),
+        [Markup.button.callback('السابق', previousCallback)],
+      ]),
     );
   }
 
@@ -789,13 +1046,26 @@ export class AddExamHandler {
   ) {
     let trackId: number | undefined;
 
+    let trackName = 'بدون تراك';
+
     if (trackValue !== 'none') {
       trackId = Number(trackValue);
 
       if (!Number.isInteger(trackId)) {
         await this.editOrReply(ctx, '❌ التراك غير صحيح.');
+
         return;
       }
+
+      const track = await this.academicService.getTrackById(trackId);
+
+      if (!track) {
+        await this.editOrReply(ctx, '❌ التراك غير موجود.');
+
+        return;
+      }
+
+      trackName = track.name;
     }
 
     const offering = await this.academicService.findCourseOffering({
@@ -809,13 +1079,22 @@ export class AddExamHandler {
 
     if (!offering) {
       await this.editOrReply(ctx, '❌ لا توجد هذه المادة في السنة المحددة.');
+
       return;
     }
+
+    const department =
+      await this.academicService.getDepartmentById(departmentId);
+
+    const level = await this.academicService.getLevelById(levelId);
+
+    const term = await this.academicService.getTermById(termId);
 
     const event = this.botEventService.get(this.getUserId(ctx));
 
     this.botEventService.update(this.getUserId(ctx), {
       event: BotEventType.WAITING_EXAM_TYPE,
+
       data: {
         ...(event?.data ?? {}),
         departmentId,
@@ -830,8 +1109,22 @@ export class AddExamHandler {
 
     await this.editOrReply(
       ctx,
-      `<b>📅 السنة:</b> ${offering.academicYear.startYear} - ${offering.academicYear.endYear}\n\n` +
-        '📝 <b>اختر نوع الاختبار:</b>',
+      [
+        '<b>📝 إضافة اختبار</b>',
+        '',
+        `<b>التخصص:</b> ${this.escapeHtml(department?.name ?? 'غير محدد')}`,
+        `<b>المستوى:</b> ${this.escapeHtml(level?.name ?? 'غير محدد')}`,
+        `<b>الترم:</b> ${this.escapeHtml(term?.name ?? 'غير محدد')}`,
+        `<b>التراك:</b> ${this.escapeHtml(trackName)}`,
+        `<b>المادة:</b> ${this.escapeHtml(offering.course.name)}`,
+        `<b>السنة:</b> ${offering.academicYear.startYear} - ${offering.academicYear.endYear}`,
+        '',
+        '<b>الخطوة 7 من 7</b>',
+        '',
+        '<b>اختر نوع الاختبار</b>',
+        '',
+        'حدد نوع الاختبار الذي تريد رفعه.',
+      ].join('\n'),
       Markup.inlineKeyboard([
         [
           Markup.button.callback(
@@ -843,6 +1136,12 @@ export class AddExamHandler {
           Markup.button.callback(
             '🧪 عملي',
             `ae/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}/${academicYearId}/P`,
+          ),
+        ],
+        [
+          Markup.button.callback(
+            'السابق',
+            `ae/${departmentId}/${levelId}/${termId}/${trackValue}/${courseId}`,
           ),
         ],
       ]),
@@ -871,18 +1170,32 @@ export class AddExamHandler {
       type = ResourceType.PRACTICAL;
     } else {
       await this.editOrReply(ctx, '❌ نوع الاختبار غير صحيح.');
+
       return;
     }
 
     let trackId: number | undefined;
+
+    let trackName = 'بدون تراك';
 
     if (trackValue !== 'none') {
       trackId = Number(trackValue);
 
       if (!Number.isInteger(trackId)) {
         await this.editOrReply(ctx, '❌ التراك غير صحيح.');
+
         return;
       }
+
+      const track = await this.academicService.getTrackById(trackId);
+
+      if (!track) {
+        await this.editOrReply(ctx, '❌ التراك غير موجود.');
+
+        return;
+      }
+
+      trackName = track.name;
     }
 
     const offering = await this.academicService.findCourseOffering({
@@ -896,13 +1209,24 @@ export class AddExamHandler {
 
     if (!offering) {
       await this.editOrReply(ctx, '❌ لا توجد هذه المادة في السياق المحدد.');
+
       return;
     }
+
+    const department =
+      await this.academicService.getDepartmentById(departmentId);
+
+    const level = await this.academicService.getLevelById(levelId);
+
+    const term = await this.academicService.getTermById(termId);
+
+    const typeName = type === ResourceType.THEORY ? 'نظري' : 'عملي';
 
     const event = this.botEventService.get(this.getUserId(ctx));
 
     this.botEventService.update(this.getUserId(ctx), {
       event: BotEventType.WAITING_EXAM_DOCUMENT,
+
       data: {
         ...(event?.data ?? {}),
         departmentId,
@@ -918,7 +1242,24 @@ export class AddExamHandler {
 
     await this.editOrReply(
       ctx,
-      '📎 <b>إرسال الاختبار</b>\n\nأرسل ملف الاختبار بصيغة PDF:',
+      [
+        '<b>📝 إضافة اختبار</b>',
+        '',
+        `<b>التخصص:</b> ${this.escapeHtml(department?.name ?? 'غير محدد')}`,
+        `<b>المستوى:</b> ${this.escapeHtml(level?.name ?? 'غير محدد')}`,
+        `<b>الترم:</b> ${this.escapeHtml(term?.name ?? 'غير محدد')}`,
+        `<b>التراك:</b> ${this.escapeHtml(trackName)}`,
+        `<b>المادة:</b> ${this.escapeHtml(offering.course.name)}`,
+        `<b>السنة:</b> ${offering.academicYear.startYear} - ${offering.academicYear.endYear}`,
+        `<b>نوع الاختبار:</b> ${typeName}`,
+        '',
+        '<b>📎 إرسال الاختبار</b>',
+        '',
+        'أرسل ملف الاختبار بصيغة <b>PDF</b>.',
+      ].join('\n'),
+      Markup.inlineKeyboard([
+        [Markup.button.callback('❌ إلغاء', 'ae/cancel')],
+      ]),
     );
   }
 
@@ -943,9 +1284,9 @@ export class AddExamHandler {
 
     const document = message.document;
 
-    // ==========================================================
+    // =========================================================
     // Validate PDF
-    // ==========================================================
+    // =========================================================
 
     const isPdf =
       document.mime_type === 'application/pdf' ||
@@ -953,7 +1294,7 @@ export class AddExamHandler {
 
     if (!isPdf) {
       await ctx.reply(
-        '❌ <b>الملف غير صحيح</b>\n\nيجب أن يكون الملف بصيغة PDF.',
+        '❌ <b>الملف غير صحيح</b>\n\n' + 'يجب أن يكون الملف بصيغة PDF.',
         {
           parse_mode: 'HTML',
         },
@@ -962,23 +1303,32 @@ export class AddExamHandler {
       return;
     }
 
-    // ==========================================================
-    // Save file information temporarily
-    // ==========================================================
+    // =========================================================
+    // Save File Information
+    // =========================================================
 
     this.botEventService.update(userId, {
       event: BotEventType.WAITING_EXAM_TITLE,
+
       data: {
         ...(event.data ?? {}),
         telegramFileId: document.file_id,
+
         originalMessageId: message.message_id,
+
         caption: 'caption' in message ? message.caption : undefined,
       },
     });
 
-    await ctx.reply('✅ <b>تم استلام الملف</b>\n\n📝 أرسل عنوان الاختبار:', {
-      parse_mode: 'HTML',
-    });
+    await ctx.reply(
+      '✅ <b>تم استلام الملف</b>\n\n' + '📝 أرسل عنوان الاختبار:',
+      {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('❌ إلغاء', 'ae/cancel')],
+        ]),
+      },
+    );
   }
 
   // ============================================================
@@ -998,7 +1348,7 @@ export class AddExamHandler {
 
     if (!cleanTitle) {
       await ctx.reply(
-        '❌ <b>العنوان غير صحيح</b>\n\nلا يمكن أن يكون العنوان فارغًا.',
+        '❌ <b>العنوان غير صحيح</b>\n\n' + 'لا يمكن أن يكون العنوان فارغًا.',
         {
           parse_mode: 'HTML',
         },
@@ -1007,9 +1357,9 @@ export class AddExamHandler {
       return;
     }
 
-    // ==========================================================
-    // Event data
-    // ==========================================================
+    // =========================================================
+    // Event Data
+    // =========================================================
 
     const courseOfferingId = this.getNumber(event.data?.courseOfferingId);
 
@@ -1026,7 +1376,7 @@ export class AddExamHandler {
       !this.isResourceType(type)
     ) {
       await ctx.reply(
-        '❌ <b>بيانات العملية غير مكتملة</b>\n\nيرجى بدء العملية من جديد.',
+        '❌ <b>بيانات العملية غير مكتملة</b>\n\n' + 'يرجى بدء العملية من جديد.',
         {
           parse_mode: 'HTML',
         },
@@ -1037,9 +1387,21 @@ export class AddExamHandler {
       return;
     }
 
-    // ==========================================================
+    // =========================================================
+    // Context
+    // =========================================================
+
+    const departmentId = this.getNumberOrUndefined(event.data?.departmentId);
+
+    const levelId = this.getNumberOrUndefined(event.data?.levelId);
+
+    const termId = this.getNumberOrUndefined(event.data?.termId);
+
+    const trackValue = this.getString(event.data?.trackValue);
+
+    // =========================================================
     // Storage Channel
-    // ==========================================================
+    // =========================================================
 
     if (!this.STORAGE_CHANNEL_ID) {
       await ctx.reply('❌ قناة تخزين الاختبارات غير معرفة.');
@@ -1047,9 +1409,9 @@ export class AddExamHandler {
       return;
     }
 
-    // ==========================================================
-    // Copy Message to Storage Channel
-    // ==========================================================
+    // =========================================================
+    // Copy Message
+    // =========================================================
 
     let storageMessageId: number;
 
@@ -1072,9 +1434,9 @@ export class AddExamHandler {
       return;
     }
 
-    // ==========================================================
+    // =========================================================
     // Create Exam
-    // ==========================================================
+    // =========================================================
 
     try {
       await this.examService.createExam({
@@ -1090,33 +1452,60 @@ export class AddExamHandler {
       console.error('Failed to create exam:', error);
 
       await ctx.reply(
-        '❌ تم حفظ الملف في القناة، لكن حدث خطأ أثناء حفظ البيانات.',
+        '❌ تم حفظ الملف في القناة، ' + 'لكن حدث خطأ أثناء حفظ البيانات.',
       );
 
       return;
     }
 
-    // ==========================================================
-    // Operation completed
-    // ==========================================================
+    // =========================================================
+    // Prepare Context For Next Exam
+    // =========================================================
 
-    this.botEventService.delete(userId);
+    if (
+      departmentId !== undefined &&
+      levelId !== undefined &&
+      termId !== undefined &&
+      trackValue
+    ) {
+      this.botEventService.update(userId, {
+        event: BotEventType.WAITING_EXAM_COURSE,
 
-    // ==========================================================
+        data: {
+          departmentId,
+          levelId,
+          termId,
+          trackValue,
+        },
+      });
+    } else {
+      this.botEventService.delete(userId);
+    }
+
+    // =========================================================
     // Success
-    // ==========================================================
+    // =========================================================
 
     await ctx.reply(
       '✅ <b>تم رفع الاختبار بنجاح</b>\n\n' +
-        `📝 <b>العنوان:</b> ${this.escapeHtml(cleanTitle)}\n\n` +
+        `<b>📝 العنوان:</b> ${this.escapeHtml(cleanTitle)}\n\n` +
         'اختر الإجراء التالي:',
       {
         parse_mode: 'HTML',
+
         ...Markup.inlineKeyboard([
           [
-            Markup.button.callback('🏠 الرئيسية', 'ae'),
-            Markup.button.callback('➕ رفع اختبار آخر', 'ae'),
+            Markup.button.callback(
+              '➕ رفع اختبار آخر لنفس التخصص',
+              departmentId !== undefined &&
+                levelId !== undefined &&
+                termId !== undefined &&
+                trackValue
+                ? `ae/${departmentId}/${levelId}/${termId}/${trackValue}`
+                : 'ae',
+            ),
           ],
+          [Markup.button.callback('🏠 الرئيسية', 'main_menu')],
         ]),
       },
     );
@@ -1168,6 +1557,24 @@ export class AddExamHandler {
     }
 
     throw new Error('Expected number');
+  }
+
+  // ============================================================
+
+  private getNumberOrUndefined(value: unknown): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+
+    return undefined;
   }
 
   // ============================================================
